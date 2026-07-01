@@ -1,3 +1,0 @@
-index.md
-        gst-plugins-base-libs-doc.json
-        gst-plugins-base-plugins-doc.json

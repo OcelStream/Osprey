@@ -1,0 +1,30 @@
+Osprey
+Copyright 2026 The Osprey Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+================================================================================
+Third-party model artifacts
+================================================================================
+
+The sample model artifacts distributed under `server/deepstream/models/` are NOT
+covered by the Apache-2.0 license that applies to Osprey's source code. Each is
+governed by its own upstream license. Review and comply with these before
+redistributing the models or using them in a commercial product.
+
+  RT-DETR-L  (rtdetr-l-det-template.onnx)
+    Upstream: RT-DETR (https://github.com/lyuwenyu/RT-DETR)
+    License:  Apache-2.0
+
+  YOLO detection  (yolo11l_bbox_v8-trt.onnx)
+  YOLO segmentation  (conv_seg_v6-trt.onnx)
+    Upstream: Ultralytics YOLO (https://github.com/ultralytics/ultralytics)
+    License:  AGPL-3.0
+    NOTE: AGPL-3.0 imposes obligations (including source-availability for network
+    use) on works derived from these weights. If you cannot comply with AGPL-3.0,
+    do not ship or deploy the YOLO-derived sample models; use the Apache-licensed
+    RT-DETR path or supply your own appropriately-licensed model.
+
+  resnet50_market1501.etlt  (Re-ID, NvDeepSORT only — not bundled)
+    Upstream: NVIDIA TAO / NGC
+    License:  NVIDIA model license (see NGC). Download separately.

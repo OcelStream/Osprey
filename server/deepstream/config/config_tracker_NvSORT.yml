@@ -1,0 +1,40 @@
+%YAML:1.0
+# NvSORT tracker configuration
+# Lightweight tracker — no GPU, Kalman filter + cascaded data association.
+# Best for YOLO detectors running every frame (interval=0).
+#
+# Based on NVIDIA's reference config with checkClassMatch disabled for YOLO.
+
+BaseConfig:
+  minDetectorConfidence: 0.1345
+
+TargetManagement:
+  enableBboxUnClipping: 0
+  maxTargetsPerStream: 300
+  minIouDiff4NewTarget: 0.5780
+  minTrackerConfidence: 0.8216
+  probationAge: 5
+  maxShadowTrackingAge: 26
+  earlyTerminationAge: 1
+
+TrajectoryManagement:
+  useUniqueID: 0
+
+DataAssociator:
+  dataAssociatorType: 0
+  associationMatcherType: 1     # cascaded matching
+  checkClassMatch: 0            # disabled for YOLO (can misclassify same object)
+  minMatchingScore4Overall: 0.2543
+  minMatchingScore4SizeSimilarity: 0.4019
+  minMatchingScore4Iou: 0.2159
+  matchingScoreWeight4SizeSimilarity: 0.1365
+  matchingScoreWeight4Iou: 0.3836
+  tentativeDetectorConfidence: 0.2331
+  minMatchingScore4TentativeIou: 0.2867
+  usePrediction4Assoc: 1        # use predicted state for association
+
+StateEstimator:
+  stateEstimatorType: 2         # regular-bbox Kalman filter
+  noiseWeightVar4Loc: 0.0301
+  noiseWeightVar4Vel: 0.0017
+  useAspectRatio: 1

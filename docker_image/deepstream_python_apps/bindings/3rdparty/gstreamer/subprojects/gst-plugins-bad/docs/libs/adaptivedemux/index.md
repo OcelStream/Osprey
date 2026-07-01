@@ -1,1 +1,0 @@
-# Adaptive Demux library

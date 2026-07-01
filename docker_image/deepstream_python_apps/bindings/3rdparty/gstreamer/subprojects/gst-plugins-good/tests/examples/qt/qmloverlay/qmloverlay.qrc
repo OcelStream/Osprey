@@ -1,7 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file>main.qml</file>
-        <file>overlay.qml</file>
-        <file>overlay2.qml</file>
-    </qresource>
-</RCC>

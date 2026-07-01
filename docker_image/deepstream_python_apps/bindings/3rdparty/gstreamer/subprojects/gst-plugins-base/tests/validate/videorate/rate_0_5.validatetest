@@ -1,3 +1,0 @@
-set-globals, rate=(string)"0.5", decoder="!"
-
-include, location="check-rate-prop.meta"

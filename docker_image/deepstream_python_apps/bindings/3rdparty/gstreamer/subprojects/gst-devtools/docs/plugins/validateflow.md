@@ -1,3 +1,0 @@
----
-redirect: gst-validate-flow.md
-...

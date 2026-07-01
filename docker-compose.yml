@@ -4,17 +4,22 @@ services:
   deepstream:
     build:
       context: .
-      dockerfile: ./docker_image/Dockerfile
-    image: deepstream_app:experimental-
-    container_name: deepstream_app-
+      dockerfile: Dockerfile
+    image: deepstream_app:8.0
+    ipc: host
+    privileged: true
+    container_name: deepstream_app-8.0
     networks:
       - deepstream_network
-    privileged: true
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility,graphics
     env_file:
       - .env
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./:/deepstream_app
+      - ./server:/deepstream_app
+      - ./sockets:/run/nvunixfd
     working_dir: /deepstream_app
     deploy:
       resources:
@@ -27,23 +32,38 @@ services:
       - "8554:8554"
       - "5000:5000"
       - "8888:8888"
-      - "8000:8000"
+      - "7000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 1200s   # 20 min — covers TensorRT engine build time
 
-  rabbitmq:
-    image: rabbitmq:4.0-management
+  ds_client:
+    image: ilkaybrahim/deepstream_app:8.0
+    depends_on:
+      deepstream:
+        condition: service_healthy
+    ipc: host
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility,graphics
+      - USE_NEW_NVSTREAMMUX=${USE_NEW_NVSTREAMMUX}
+    volumes:
+      - ./sockets:/run/nvunixfd   
+      - ./client:/client
+    working_dir: /client
     networks:
       - deepstream_network
     ports:
-      - "5672:5672"
-      - "15672:15672"
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+      - "8557:8554"
 networks:
   deepstream_network:
     driver: bridge

@@ -1,22 +1,31 @@
-deepstream/models/
-experiments/
-backend/uploads/
-backend/core
-backend/app/core
-backend/app/README.md
-static/
-.gitignore
-deepstream/app/core
-deepstream/app/debug.log
-deepstream/app/libnvinfer_plugin.so.10.3.0.x86_64
-deepstream/app/libnvinfer_plugin.so.10.3.0.x86_64.ori.bak
-docker_image/deepstream_python_apps/apps/deepstream-demux-multi-in-multi-out/core
-core
-best.pt
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
 .venv/
-# Ignore Python cache files
-*.pyc
-deepstream/config/*.txt
-/consumer
-deepstream/messaging/__pycache__
-.env
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# TensorRT engines — generated locally at runtime, GPU/TensorRT-specific
+*.engine
+# (Sample ONNX models under server/deepstream/models/ ARE tracked.)
+
+# Compiled C/C++ objects (the checked-in .so parsers are intentionally kept;
+# only transient build intermediates are ignored)
+*.o
+*.obj
+
+# Runtime IPC sockets (shared volume is recreated on each run)
+sockets/*.sock
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs
+*.log

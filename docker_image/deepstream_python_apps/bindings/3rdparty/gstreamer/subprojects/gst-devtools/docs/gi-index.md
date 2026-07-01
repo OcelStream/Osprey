@@ -1,1 +1,0 @@
-# GstValidate API reference

@@ -1,3 +1,0 @@
-gi-index
-	pbutils.h
-	encoding-profile.h

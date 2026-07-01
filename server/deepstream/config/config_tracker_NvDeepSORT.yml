@@ -1,0 +1,66 @@
+%YAML:1.0
+# NvDeepSORT tracker configuration
+# Deep association metric tracker — uses Re-ID neural network on GPU.
+# Best for re-identifying the same object after occlusion.
+#
+# Re-ID model setup (run once inside the DeepStream container):
+#   mkdir -p /opt/nvidia/deepstream/deepstream/samples/models/Tracker/
+#   wget 'https://api.ngc.nvidia.com/v2/models/nvidia/tao/reidentificationnet/versions/deployable_v1.0/files/resnet50_market1501.etlt' \
+#        -P /opt/nvidia/deepstream/deepstream/samples/models/Tracker/
+#
+# Based on NVIDIA's reference config with checkClassMatch disabled for YOLO.
+
+BaseConfig:
+  minDetectorConfidence: 0.0762
+
+TargetManagement:
+  preserveStreamUpdateOrder: 0
+  maxTargetsPerStream: 150
+  minIouDiff4NewTarget: 0.9847
+  minTrackerConfidence: 0.4314
+  probationAge: 2
+  maxShadowTrackingAge: 68
+  earlyTerminationAge: 1
+
+TrajectoryManagement:
+  useUniqueID: 0
+
+DataAssociator:
+  dataAssociatorType: 0
+  associationMatcherType: 1     # cascaded matching
+  checkClassMatch: 0            # disabled for YOLO (can misclassify same object)
+  thresholdMahalanobis: 12.1875
+  minMatchingScore4Overall: 0.1794
+  minMatchingScore4SizeSimilarity: 0.3291
+  minMatchingScore4Iou: 0.2364
+  minMatchingScore4ReidSimilarity: 0.7505
+  matchingScoreWeight4SizeSimilarity: 0.7178
+  matchingScoreWeight4Iou: 0.4551
+  matchingScoreWeight4ReidSimilarity: 0.3197
+  tentativeDetectorConfidence: 0.2479
+  minMatchingScore4TentativeIou: 0.2376
+
+StateEstimator:
+  stateEstimatorType: 2         # regular-bbox Kalman filter
+  noiseWeightVar4Loc: 0.0503
+  noiseWeightVar4Vel: 0.0037
+  useAspectRatio: 1
+
+ReID:
+  reidType: 1                   # NvDeepSORT Re-ID
+  batchSize: 100
+  workspaceSize: 1000
+  reidFeatureSize: 256
+  reidHistorySize: 100
+  inferDims: [3, 256, 128]
+  networkMode: 1                # FP16
+  inputOrder: 0                 # NCHW
+  colorFormat: 0                # RGB
+  offsets: [123.6750, 116.2800, 103.5300]
+  netScaleFactor: 0.01735207
+  keepAspc: 1
+  addFeatureNormalization: 1
+  outputReidTensor: 0
+  tltEncodedModel: "/deepstream_app/deepstream/models/resnet50_market1501.etlt"
+  tltModelKey: "nvidia_tao"
+  modelEngineFile: "/deepstream_app/deepstream/models/resnet50_market1501.etlt_b100_gpu0_fp16.engine"

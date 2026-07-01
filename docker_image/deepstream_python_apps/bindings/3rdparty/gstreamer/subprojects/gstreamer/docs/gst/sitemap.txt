@@ -1,3 +1,0 @@
-gi-index
-	running.md
-	gst.h

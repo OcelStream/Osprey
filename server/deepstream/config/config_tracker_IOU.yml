@@ -1,0 +1,31 @@
+%YAML:1.0
+# IOU tracker configuration
+# Bare-minimum tracker — no GPU, very low CPU.
+# Uses only bounding box overlap (IOU) between consecutive frames.
+# Best when: objects are sparsely located, detector runs every frame (interval=0).
+#
+# Based on NVIDIA's reference config with checkClassMatch disabled for YOLO.
+
+BaseConfig:
+  minDetectorConfidence: 0
+
+TargetManagement:
+  preserveStreamUpdateOrder: 0
+  maxTargetsPerStream: 150
+  minIouDiff4NewTarget: 0.5
+  probationAge: 4
+  maxShadowTrackingAge: 38
+  earlyTerminationAge: 1
+
+TrajectoryManagement:
+  useUniqueID: 0
+
+DataAssociator:
+  dataAssociatorType: 0
+  associationMatcherType: 0     # greedy matching (fastest)
+  checkClassMatch: 0            # disabled for YOLO (can misclassify same object)
+  minMatchingScore4Overall: 0.0
+  minMatchingScore4SizeSimilarity: 0.0
+  minMatchingScore4Iou: 0.0
+  matchingScoreWeight4SizeSimilarity: 0.4
+  matchingScoreWeight4Iou: 0.6

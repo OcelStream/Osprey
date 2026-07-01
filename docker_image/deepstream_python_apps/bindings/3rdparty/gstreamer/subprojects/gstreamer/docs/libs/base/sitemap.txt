@@ -1,4 +1,0 @@
-gi-index
-        gstbitreader.h
-        gstbytereader.h
-        gstbytewriter.h

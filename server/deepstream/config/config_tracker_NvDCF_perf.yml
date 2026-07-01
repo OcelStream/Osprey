@@ -1,0 +1,55 @@
+%YAML:1.0
+# NvDCF tracker configuration (performance profile)
+# Visual correlation filter tracker — uses GPU for appearance features.
+# Best balance of accuracy + robustness. Handles missed detections (occlusion).
+# Works well with PGIE interval > 0.
+#
+# Based on NVIDIA's reference config with checkClassMatch disabled for YOLO.
+
+BaseConfig:
+  minDetectorConfidence: 0.0430
+
+TargetManagement:
+  enableBboxUnClipping: 1
+  preserveStreamUpdateOrder: 0
+  maxTargetsPerStream: 150
+  minIouDiff4NewTarget: 0.7418
+  minTrackerConfidence: 0.4009
+  probationAge: 2
+  maxShadowTrackingAge: 51
+  earlyTerminationAge: 1
+
+TrajectoryManagement:
+  useUniqueID: 0
+
+DataAssociator:
+  dataAssociatorType: 0
+  associationMatcherType: 1     # cascaded matching
+  checkClassMatch: 0            # disabled for YOLO (can misclassify same object)
+  minMatchingScore4Overall: 0.4290
+  minMatchingScore4SizeSimilarity: 0.3627
+  minMatchingScore4Iou: 0.2575
+  minMatchingScore4VisualSimilarity: 0.5356
+  matchingScoreWeight4VisualSimilarity: 0.3370
+  matchingScoreWeight4SizeSimilarity: 0.4354
+  matchingScoreWeight4Iou: 0.3656
+  tentativeDetectorConfidence: 0.2008
+  minMatchingScore4TentativeIou: 0.5296
+
+StateEstimator:
+  stateEstimatorType: 1         # simple-bbox Kalman filter
+  processNoiseVar4Loc: 1.5110
+  processNoiseVar4Size: 1.3159
+  processNoiseVar4Vel: 0.0300
+  measurementNoiseVar4Detector: 3.0283
+  measurementNoiseVar4Tracker: 8.1505
+
+VisualTracker:
+  visualTrackerType: 2          # NvDCF_VPI (GPU-accelerated)
+  useColorNames: 1
+  useHog: 0
+  featureImgSizeLevel: 2        # 1-5, lower=faster
+  featureFocusOffsetFactor_y: -0.2000
+  filterLr: 0.0750
+  filterChannelWeightsLr: 0.1000
+  gaussianSigma: 0.7500
