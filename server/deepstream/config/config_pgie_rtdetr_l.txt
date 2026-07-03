@@ -1,7 +1,8 @@
 [property]
 gpu-id=0
 net-scale-factor=0.0039215697906911373
-model-color-format=1
+# 0 = RGB — Ultralytics RT-DETR is RGB-trained, same as the YOLO models
+model-color-format=0
 onnx-file=/deepstream_app/deepstream/models/rtdetr-l-det-template.onnx
 model-engine-file=/deepstream_app/deepstream/models/rtdetr-l-det-template.onnx.engine
 
@@ -10,7 +11,8 @@ labelfile-path=/deepstream_app/deepstream/config/labels_det.txt
 batch-size=10
 #enable-batch-process=1
 network-mode=0
-num-detected-classes=40
+# must match the model's class count = lines in labelfile-path
+num-detected-classes=7
 interval=0
 gie-unique-id=1
 process-mode=1

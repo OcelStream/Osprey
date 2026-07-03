@@ -36,7 +36,9 @@ Parameter reference
 
 - `model-color-format`  
   - Input color format expected by the model.  
-  - `0` usually means BGR, `1` usually means RGB (depending on plugin implementation).
+  - `0` = RGB, `1` = BGR, `2` = GRAY (nvinfer semantics).  
+  - Ultralytics-trained YOLO / RT-DETR models (including everything exported by
+    the Osprey platform) are RGB-trained — use `0`.
 
 - `onnx-file`  
   - Path to the ONNX model file used to build or load the TensorRT engine.

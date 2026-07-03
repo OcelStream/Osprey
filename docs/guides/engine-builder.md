@@ -88,7 +88,7 @@ DeepStream owns it.
 Delete the engine file and restart:
 
 ```bash
-rm server/deepstream/models/yolo11l.pt.onnx.engine
+rm server/deepstream/models/yolo11l_bbox_v8-trt.onnx.engine
 docker compose restart deepstream
 ```
 

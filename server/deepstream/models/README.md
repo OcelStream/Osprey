@@ -12,19 +12,24 @@ Each PGIE config points at a specific ONNX filename. Drop the matching model her
 | Task | Config (`server/deepstream/config/`) | Expected ONNX | Parser | Labels |
 |------|--------------------------------------|---------------|--------|--------|
 | YOLO detection | `config_pgie_yolo_detct.txt` | `yolo11l_bbox_v8-trt.onnx` | `nvdsinfer_yolo_det.so` | `labels_det.txt` |
-| YOLO segmentation | `config_pgie_yolo_seg.txt` | `conv_seg_v6-trt.onnx` | `nvdsinfer_yolo_seg.so` | `yolo11l-seg_labels.txt` |
+| YOLO segmentation | `config_pgie_yolo_seg.txt` | `conv_seg_v6-trt.onnx` | `nvdsinfer_yolo_seg.so` | `labels_seg.txt` |
 | RT-DETR | `config_pgie_rtdetr_l.txt` | `rtdetr-l-det-template.onnx` | `nvdsinfer_rtdetr.so` | `labels_det.txt` |
 
 The ONNX must expose output layers that match the parser it is paired with. If you
 change the filename, update the `onnx-file` / `model-engine-file` lines in the
-corresponding config.
+corresponding config — and always keep `num-detected-classes` equal to the number
+of lines in the labels file (which must match the model's class count).
+
+Models exported by the [Osprey platform](https://ospreyai.dev/export) come with a
+ready-made config (`<model>-trt-config.txt`) that already has all of these set —
+point `GIE_0_CONFIG` at it instead of editing the samples above.
 
 ## Re-ID model (NvDeepSORT only)
 
 `DS_TRACKER=NvDeepSORT` additionally needs `resnet50_market1501.etlt`, a TAO-encoded
 Re-ID model published by NVIDIA. It is **not bundled**; download it from NGC as
 documented in [`docs/guides/tracking-implementation.md`](../../../docs/guides/tracking-implementation.md).
-The default tracker (`NvDCF`) does not require it.
+The other trackers (`IOU`, `NvSORT`, `NvDCF`) do not require it.
 
 ## Licensing
 

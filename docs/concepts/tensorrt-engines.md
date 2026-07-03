@@ -167,8 +167,8 @@ GIE_0_CONFIG=/deepstream_app/deepstream/config/config_pgie_yolo_detct.txt
 
 ```python
 # 2. Parse the nvinfer config to find:
-onnx_file   = /deepstream_app/deepstream/models/yolo11l.pt.onnx
-engine_file = /deepstream_app/deepstream/models/yolo11l.pt.onnx.engine
+onnx_file   = /deepstream_app/deepstream/models/yolo11l_bbox_v8-trt.onnx
+engine_file = /deepstream_app/deepstream/models/yolo11l_bbox_v8-trt.onnx.engine
 batch_size  = 10
 network_mode = 0   # FP32
 gpu_id       = 0
@@ -191,8 +191,8 @@ input_name = "images"
 ```python
 # 5. Call trtexec
 trtexec \
-  --onnx=/deepstream_app/deepstream/models/yolo11l.pt.onnx \
-  --saveEngine=/deepstream_app/deepstream/models/yolo11l.pt.onnx.engine \
+  --onnx=/deepstream_app/deepstream/models/yolo11l_bbox_v8-trt.onnx \
+  --saveEngine=/deepstream_app/deepstream/models/yolo11l_bbox_v8-trt.onnx.engine \
   --device=0 \
   --minShapes=images:1x3x640x640 \
   --optShapes=images:10x3x640x640 \
@@ -229,7 +229,7 @@ DeepStream's `nvinfer` generates engine filenames automatically when
 ```
 <onnx_filename>_b<batch>_gpu<id>_<precision>.engine
 
-yolo11l.pt.onnx_b10_gpu0_fp32.engine
+yolo11l_bbox_v8-trt.onnx_b10_gpu0_fp32.engine
 ```
 
 When `model-engine-file` **is** set (as in this project), DeepStream uses that
