@@ -109,6 +109,11 @@ GIE_1_CONFIG=/deepstream_app/deepstream/config/config_pgie_yolo_seg.txt
 The builder picks up every `GIE_N_CONFIG` variable automatically — no code
 changes needed.
 
+> Starting from a `.pt` checkpoint? [ospreyai.dev/export](https://ospreyai.dev/export)
+> converts it in the browser and hands back the ONNX, the labels file, **and** a
+> ready-made nvinfer config (with `infer-dims` already matching the export size) —
+> steps 1–2 become copy-paste.
+
 ---
 
 ## Run the builder manually

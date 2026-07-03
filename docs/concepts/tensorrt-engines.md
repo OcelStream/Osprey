@@ -42,6 +42,11 @@ graph:
 Every weight is embedded in the file. A YOLO11-L ONNX is ~100 MB because it
 is carrying all those numbers.
 
+Osprey needs an ONNX whose output layers match its custom parsers (in-graph
+NMS via TRT plugins). The hosted exporter at
+[ospreyai.dev/export](https://ospreyai.dev/export) produces exactly this format
+from a plain `.pt` checkpoint — no local TensorRT install needed.
+
 ---
 
 ## What is a TensorRT Engine?

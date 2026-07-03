@@ -23,7 +23,7 @@ Two Docker containers, one GPU, one shared socket directory:
 ┌────────────────────────────────────────────────────────────┐
 │  deepstream container (server)                             │
 │                                                            │
-│  FastAPI (:5000) ──▶ DynamicRTSPPipeline                         │
+│  FastAPI (:7000) ──▶ DynamicRTSPPipeline                         │
 │                       nvstreammux → YOLO GIE(s) → nvtracker → demux │
 │                                                    │       │
 │                                          nvunixfdsink      │
@@ -64,6 +64,12 @@ expects a TensorRT-ready ONNX whose output layers match that parser. Sample mode
 are included under `server/deepstream/models/`; see that directory's README for how
 to bring your own.
 
+> **Have a `.pt` checkpoint?** Export it in your browser with the hosted
+> [Osprey Platform](https://ospreyai.dev/export) — no TensorRT or CUDA toolchain
+> needed. It returns a TRT-compatible ONNX with the right output layers for these
+> parsers, plus the labels file and a ready-made nvinfer config. You can also
+> browse community-exported models on the [Hub](https://ospreyai.dev/hub).
+
 ---
 
 ## Quick Start
@@ -96,6 +102,12 @@ pipeline runs end-to-end out of the box. To use your own model, put its TensorRT
 ONNX in `server/deepstream/models/` and point `GIE_0_CONFIG` at the matching config
 file. See [`server/deepstream/models/README.md`](server/deepstream/models/README.md)
 for the per-config filenames and model-license details.
+
+If your weights are still a `.pt` checkpoint, export them at
+[ospreyai.dev/export](https://ospreyai.dev/export): it produces `<model>-trt.onnx`,
+a `<model>-trt.txt` labels file, and a `<model>-trt-config.txt` nvinfer config —
+copy the ONNX to `server/deepstream/models/`, the two `.txt` files to
+`server/deepstream/config/`, and point `GIE_0_CONFIG` in `.env` at the config.
 
 | Model type | Config file | Custom parser |
 |---|---|---|
@@ -138,7 +150,7 @@ Wait for the server log `Pipeline is PLAYING` before adding streams.
 ### 3. Add a stream
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/add \
+curl -X POST http://localhost:7000/api/v1/add \
   -H "Content-Type: application/json" \
   -d '{
     "uri": "rtsp://your-camera/stream",
@@ -160,7 +172,8 @@ rtsp://localhost:8557/ds-testcamera-1
 
 ## REST API
 
-All endpoints are under `http://localhost:5000/api/v1`.
+All endpoints are under `http://localhost:7000/api/v1` (host port `7000` maps to
+the container's `8000`).
 
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
@@ -331,7 +344,7 @@ a complete parking monitor example.
 
 | Host Port | Container Port | Service | Protocol |
 |-----------|---------------|---------|----------|
-| `5000` | `5000` | Server — FastAPI | HTTP |
+| `7000` | `8000` | Server — FastAPI | HTTP |
 | `8554` | `8554` | Server — RTSP | RTSP |
 | `8557` | `8554` | Client — RTSP | RTSP |
 
@@ -394,6 +407,14 @@ a complete parking monitor example.
 | [`docs/guides/tracker-implementation.md`](docs/guides/tracker-implementation.md) | Gst-nvtracker integration — a concise walkthrough |
 | [`docs/guides/metadata-guide.md`](docs/guides/metadata-guide.md) | DeepStream metadata model — the complete guide |
 | [`docs/guides/metadata-structs-visual.md`](docs/guides/metadata-structs-visual.md) | Visual reference for the metadata structs |
+
+### Hosted platform (ospreyai.dev)
+
+| Resource | Description |
+|----------|-------------|
+| [ospreyai.dev/export](https://ospreyai.dev/export) | Browser-based `.pt` → TRT-compatible ONNX exporter — returns ONNX + labels + ready-made nvinfer config |
+| [ospreyai.dev/hub](https://ospreyai.dev/hub) | Public gallery of community-exported models, ready to drop into this pipeline |
+| [ospreyai.dev/docs](https://ospreyai.dev/docs) | Hosted docs — quickstart, export guide, REST API and settings reference |
 
 ### Server implementation
 
