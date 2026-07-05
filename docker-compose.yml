@@ -32,7 +32,7 @@ services:
       - "8554:8554"
       - "5000:5000"
       - "8888:8888"
-      - "7000:8000"
+      - "7700:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/ready"]
       interval: 15s
@@ -57,9 +57,10 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility,graphics
       - USE_NEW_NVSTREAMMUX=${USE_NEW_NVSTREAMMUX}
     volumes:
-      - ./sockets:/run/nvunixfd   
+      - ./sockets:/run/nvunixfd
       - ./client:/client
     working_dir: /client
+    command: python3 base_client.py
     networks:
       - deepstream_network
     ports:
