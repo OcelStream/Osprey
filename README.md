@@ -76,7 +76,7 @@ to bring your own.
 
 ### Prerequisites
 
-- NVIDIA GPU with driver 535+
+- NVIDIA GPU with driver **570+** (CUDA 13 — required by DeepStream 8.0)
 - Docker with [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
 - Docker Compose v2
 
@@ -429,7 +429,7 @@ a complete parking monitor example.
 ## Requirements
 
 - NVIDIA GPU (Turing or later recommended)
-- NVIDIA Driver 535+
+- NVIDIA Driver **570+** with **CUDA 13** (baseline for DeepStream 8.0)
 - Docker 24+ with NVIDIA Container Toolkit
 - Docker Compose v2
 - DeepStream 8.0 base image (`ilkaybrahim/deepstream_app:8.0`)

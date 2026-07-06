@@ -5,6 +5,14 @@ This project is split into two main components that run in separate Docker servi
 - **Server (`deepstream` service)**: Hosts the DeepStream pipeline and the FastAPI backend.
 - **Client (`ds_client` service)**: Runs a GStreamer-based DeepStream client that discovers Unix sockets and exposes RTSP streams.
 
+### Host requirements
+
+Both services run on the host GPU through the NVIDIA Container Toolkit, so the host must satisfy the DeepStream 8.0 baseline:
+
+- NVIDIA GPU (Turing or later recommended)
+- **NVIDIA driver 570+ with CUDA 13** — the baseline for the DeepStream 8.0 base image (`ilkaybrahim/deepstream_app:8.0`)
+- Docker 24+ with NVIDIA Container Toolkit, and Docker Compose v2
+
 ### Containers and services
 
 - **`deepstream` (server)**
