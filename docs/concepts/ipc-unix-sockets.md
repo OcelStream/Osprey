@@ -1,6 +1,6 @@
 # IPC — Unix Sockets and Zero-Copy GPU Buffers
 
-> How frames travel from the inference container to the client container
+> How frames travel from the server process to the client process
 > without being copied through the CPU.
 
 ---
@@ -19,7 +19,7 @@ The system avoids this entirely using GPU buffer file descriptor passing.
 ## How `nvunixfdsink` / `nvunixfdsrc` Work
 
 ```
-Server process (deepstream container)         Client process (ds_client container)
+Server process (osprey-server)                Client process (osprey-client)
                                               
  GStreamer pipeline                            GStreamer pipeline
  ...                                           nvunixfdsrc
@@ -59,38 +59,30 @@ is needed for metadata.
 
 ---
 
-## The Shared Volume
+## The Socket Directory
 
-```yaml
-# docker-compose.yml
-volumes:
-  - ./sockets:/run/nvunixfd
-```
-
-Both containers mount `./sockets` at `/run/nvunixfd`. This serves two
-purposes:
+Both processes use the same directory, `/run/nvunixfd`, on the host. This
+serves two purposes:
 
 1. **Socket file discovery** — the client's watcher thread calls `os.listdir("/run/nvunixfd")` to detect new streams
 2. **Socket connection** — `nvunixfdsrc` connects to the socket path to receive buffers
 
-The host path `./sockets` must be a shared volume. The socket files themselves
-are not the data channel — they are just the rendezvous point. The actual GPU
-buffer handles flow through the socket connection.
+The directory is a plain host-local path (created by `sudo osprey-bootstrap`).
+The socket files themselves are not the data channel — they are just the
+rendezvous point. The actual GPU buffer handles flow through the socket
+connection.
 
 ---
 
-## The `ipc: host` Requirement
-
-```yaml
-# docker-compose.yml
-ipc: host
-```
+## The Shared IPC Namespace
 
 CUDA IPC (`cudaIpcOpenMemHandle`) shares GPU memory between processes using the
-OS's IPC namespace. By default, Docker gives each container its own IPC
-namespace, which breaks cross-container CUDA IPC. `ipc: host` makes both
-containers share the host's IPC namespace, allowing the client to open memory
-handles created by the server.
+OS's IPC namespace. Because the server and the client run as two ordinary
+processes on the **same host**, they already share the host's IPC namespace —
+so the client can open memory handles created by the server with no extra
+configuration. (This is the constraint that a container deployment would have
+had to recover with an `ipc: host` setting; running natively on one host, it
+is automatic.)
 
 ---
 
@@ -135,12 +127,12 @@ The bounding box data (inference results) is attached to each buffer as
 
 To pass this across a process boundary, it must be serialised into bytes.
 `nvunixfdsink` calls `serialize_meta.so` (a custom C shared library in
-`server/deepstream/app/lib/`) to pack the struct into the buffer. `nvunixfdsrc`
+`osprey/server/deepstream/lib/`) to pack the struct into the buffer. `nvunixfdsrc`
 calls `deserialize_meta.so` to unpack it on the client side.
 
 The path to the serialization library is configured via:
 ```
-DS_META_SERIALIZATION_LIB=/deepstream_app/deepstream/app/lib/serialize_meta.so
+DS_META_SERIALIZATION_LIB=osprey/server/deepstream/lib/serialize_meta.so
 ```
 
 ---
@@ -150,7 +142,7 @@ DS_META_SERIALIZATION_LIB=/deepstream_app/deepstream/app/lib/serialize_meta.so
 | Mechanism | Throughput | Metadata | NVMM support | Complexity |
 |-----------|-----------|----------|--------------|------------|
 | **nvunixfdsink** (this system) | High | Native | Yes | Low |
-| TCP (rtsp between containers) | Medium | Separate channel | No | Medium |
+| TCP (rtsp between processes) | Medium | Separate channel | No | Medium |
 | shmsink (CPU shared memory) | High | Manual | No | Medium |
 | ZeroMQ (Savant approach) | Medium | Custom protocol | No | High |
 

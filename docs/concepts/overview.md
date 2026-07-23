@@ -40,7 +40,7 @@ RTSP cameras (any number)
         │
         ▼
   ┌─────────────────────────────────┐
-  │  Server container               │
+  │  Server process                 │
   │                                 │
   │  REST API — add / remove        │
   │  streams at runtime             │
@@ -51,7 +51,7 @@ RTSP cameras (any number)
   └──────────────┬──────────────────┘
                  │ Unix sockets (zero-copy GPU buffers)
   ┌──────────────▼──────────────────┐
-  │  Client container               │
+  │  Client process                 │
   │                                 │
   │  Your application code          │
   │  Drawing, alerting, analytics   │
@@ -89,7 +89,7 @@ and receive a `FrameData` with a Python list of `ObjectData`.
 | IPC mechanism | Output format |
 | Thread safety model | Stream selection logic |
 
-These two groups live in different containers, different files, and different
+These two groups live in different processes, different files, and different
 abstraction layers — intentionally.
 
 ### One GPU, many streams
@@ -123,8 +123,8 @@ teardown sequence) exists to make this safe.
 | Question | Document |
 |----------|----------|
 | How does the GStreamer pipeline work? | [deepstream-pipeline.md](deepstream-pipeline.md) |
-| Why two containers? | [two-container-model.md](two-container-model.md) |
+| Why two processes? | [two-process-model.md](two-process-model.md) |
 | What happens when I add a stream? | [stream-lifecycle.md](stream-lifecycle.md) |
-| How do GPU buffers move between containers? | [ipc-unix-sockets.md](ipc-unix-sockets.md) |
+| How do GPU buffers move between processes? | [ipc-unix-sockets.md](ipc-unix-sockets.md) |
 | How do I build an application on this? | [guides/building-apps.md](../guides/building-apps.md) |
 | What is the full architecture? | [architecture/arch.md](../architecture/arch.md) |

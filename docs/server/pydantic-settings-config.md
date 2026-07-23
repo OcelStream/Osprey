@@ -1,9 +1,8 @@
 # Pipeline Configuration — Pydantic `BaseSettings`
 
 > **Status:** Implemented  
-> **Files changed:** `server/backend/app/core/settings.py` (new), `server/deepstream/app/deepstream.py`, `server/backend/app/core/context.py`, `server/backend/requirements.txt`  
-> **Replaces:** `PipelineConfig` dataclass + `os.getenv` in `deepstream.py`  
-> **Related:** [Architecture Proposal §10](../local/architecture-proposal.md#10-configuration-architecture) · [Refactoring Suggestions §8](../local/refactoring-suggestions.md)
+> **Files changed:** `osprey/server/core/settings.py` (new), `osprey/server/deepstream/pipeline.py`, `osprey/server/core/context.py`, `pyproject.toml`  
+> **Replaces:** `PipelineConfig` dataclass + `os.getenv` in `pipeline.py`
 
 ---
 
@@ -23,12 +22,12 @@
 
 ## 1. Problem Statement
 
-The original `PipelineConfig` in `deepstream.py` had three compounding problems:
+The original `PipelineConfig` in `pipeline.py` had three compounding problems:
 
 ### Problem A — Fragile manual parsing
 
 ```python
-# deepstream.py — old (REMOVED)
+# pipeline.py — old (REMOVED)
 cfg = cls(
     max_sources=int(os.getenv("MAX_RESOURCES", "40")),
     batched_push_timeout=int(os.getenv("batched_push_timeout", "66666")),
@@ -58,10 +57,10 @@ defaults dead code that confused anyone reading the code.
 
 ### Problem C — Config lived inside the DeepStream module
 
-`PipelineConfig` was defined in `deepstream.py` — the GStreamer pipeline module.
+`PipelineConfig` was defined in `pipeline.py` — the GStreamer pipeline module.
 Configuration is a concern of the application entry point, not the pipeline
 implementation. This made it impossible to load and validate config without
-importing the entire GStreamer-heavy `deepstream` module.
+importing the entire GStreamer-heavy `osprey.server.deepstream` package.
 
 ---
 
@@ -69,17 +68,17 @@ importing the entire GStreamer-heavy `deepstream` module.
 
 | Before | After |
 |--------|-------|
-| `PipelineConfig` dataclass in `deepstream.py` | `PipelineSettings(BaseSettings)` in `settings.py` |
+| `PipelineConfig` dataclass in `pipeline.py` | `PipelineSettings(BaseSettings)` in `settings.py` |
 | `os.getenv` with manual `int()` casts | Pydantic validates and coerces types automatically |
 | `max_sources` in three places | Removed — replaced with `_NVSTREAMMUX_BATCH_SIZE = 64` constant |
-| Config created inside `deepstream.py` | Config created at app startup, injected into pipeline |
+| Config created inside `pipeline.py` | Config created at app startup, injected into pipeline |
 | No validation — bad env vars crash at runtime | Pydantic raises a clear error at startup with field name |
 
 ---
 
 ## 3. PipelineSettings — Field Reference
 
-**File:** [server/backend/app/core/settings.py](../../server/backend/app/core/settings.py)
+**File:** `osprey/server/core/settings.py`
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -97,7 +96,7 @@ class PipelineSettings(BaseSettings):
     model_height: int = 640
     codec: str = "H265"
     bitrate: int = 4_000_000
-    meta_serialization_lib: str = "/deepstream_app/deepstream/app/lib/serialize_meta.so"
+    meta_serialization_lib: str = "osprey/server/deepstream/lib/serialize_meta.so"
     perf_interval_ms: int = 5_000
 ```
 
@@ -177,12 +176,12 @@ def hidden_class_names(self) -> Set[str]:
 ### `.env` example for GIE
 
 ```dotenv
-GIE_0_CONFIG=/deepstream_app/deepstream/config/config_pgie_yolo_detct.txt
-GIE_1_CONFIG=/deepstream_app/deepstream/config/config_sgie.txt
+GIE_0_CONFIG=osprey/server/config/config_pgie_yolo_detct.txt
+GIE_1_CONFIG=osprey/server/config/config_sgie.txt
 GIE_0_HIDE_CLASS_NAMES=person,bicycle
 ```
 
-`gie_configs` returns `["/deepstream_app/...detct.txt", "/deepstream_app/...sgie.txt"]` —
+`gie_configs` returns `["osprey/server/config/...detct.txt", "osprey/server/config/...sgie.txt"]` —
 sorted by the numeric index, so order is deterministic regardless of how env
 vars are declared.
 
@@ -195,10 +194,10 @@ vars are declared.
    allocates at creation time.
 2. Limit `SpotManager` — how many concurrent streams are allowed.
 
-Both are now driven by a single module-level constant in `deepstream.py`:
+Both are now driven by a single module-level constant in `pipeline.py`:
 
 ```python
-# deepstream.py
+# pipeline.py
 _NVSTREAMMUX_BATCH_SIZE = 64
 ```
 
@@ -210,7 +209,7 @@ knob. Removing it from config prevents false confidence that bumping a number
 in `.env` gives you more capacity.
 
 If you're porting to Jetson or another platform with a lower practical limit,
-change `_NVSTREAMMUX_BATCH_SIZE` in `deepstream.py` to match the hardware.
+change `_NVSTREAMMUX_BATCH_SIZE` in `pipeline.py` to match the hardware.
 
 ---
 
@@ -221,7 +220,7 @@ change `_NVSTREAMMUX_BATCH_SIZE` in `deepstream.py` to match the hardware.
            │
            ▼
    PipelineSettings()          ← pydantic validates + coerces types
-   server/backend/app/core/settings.py
+   osprey/server/core/settings.py
            │
            │  settings singleton
            ▼
@@ -229,13 +228,13 @@ change `_NVSTREAMMUX_BATCH_SIZE` in `deepstream.py` to match the hardware.
    pipeline = DynamicRTSPPipeline(settings=settings)
            │
            ▼
-   deepstream.py  DynamicRTSPPipeline.__init__(settings)
+   pipeline.py  DynamicRTSPPipeline.__init__(settings)
        self._config = settings         ← immutable validated config
        self._hidden_class_names = set(settings.hidden_class_names)
                                         ← mutable runtime copy
 ```
 
-`deepstream.py` receives the settings object through its constructor — it does
+`pipeline.py` receives the settings object through its constructor — it does
 not import `PipelineSettings` directly. This keeps the GStreamer module free
 of any dependency on the FastAPI application layer.
 
@@ -251,7 +250,7 @@ runtime, which mutate the hidden set.
 To handle this, `DynamicRTSPPipeline.__init__` creates a **mutable copy**:
 
 ```python
-# deepstream.py
+# pipeline.py
 self._hidden_class_names: set = set(settings.hidden_class_names)
 ```
 
@@ -285,7 +284,7 @@ rtsp_reconnect_attempts: int = 10
 
 Pydantic will read `DS_RTSP_RECONNECT_ATTEMPTS` from the environment automatically.
 
-**Step 2** — Use it in `deepstream.py` via `self._config`:
+**Step 2** — Use it in `pipeline.py` via `self._config`:
 
 ```python
 # source_bin_factory or wherever needed

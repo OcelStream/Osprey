@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ospreyai"
+version = "0.1.4"
+description = "Dynamic multi-stream video-analytics library on NVIDIA DeepStream 8.0"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ILKAY-BRAHIM" }]
+keywords = ["deepstream", "video-analytics", "rtsp", "yolo", "tensorrt", "gstreamer"]
+
+# Only PyPI-installable runtime deps are listed here.
+# The DeepStream layer — `pyds` and the GStreamer python bindings (`gi`,
+# provided by the system `python3-gi` package) — is NOT on PyPI. It ships
+# with the DeepStream 8.0 SDK and must already be present on the host.
+# See README "Prerequisites".
+#
+# Server (control plane) and client run on the SAME host — they talk over
+# host-local Unix domain sockets (/run/nvunixfd/*.sock) — so both halves are
+# always needed together. Everything is a single dependency set; no extras.
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "pydantic-settings",
+    "python-multipart",
+]
+
+[project.scripts]
+osprey-client = "osprey.client.base_client:main"
+osprey-server = "osprey.server.app:main"
+osprey-build-engines = "osprey.server.deepstream.build_engines:main"
+osprey-bootstrap = "osprey.bootstrap:main"
+osprey-doctor = "osprey.doctor:main"
+
+[project.urls]
+Homepage = "https://ospreyai.dev"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Ship the precompiled DS-8.0 / CUDA-12.8 native libraries + configs as data.
+"osprey.client" = ["lib/*.so"]
+"osprey.server" = ["config/*.txt", "config/*.yml", "config/*.md"]
+"osprey.server.deepstream" = ["lib/*.so"]
+# Bare-metal bootstrap scripts run by `osprey-bootstrap`.
+"osprey._bootstrap" = ["*.sh"]

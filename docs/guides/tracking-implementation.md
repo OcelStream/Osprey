@@ -14,12 +14,12 @@ from the concept of what tracking is, through every file that was changed or cre
 5. [The Full Data Flow — End to End](#5-the-full-data-flow--end-to-end)
 6. [What Was Already in Place](#6-what-was-already-in-place)
 7. [Implementation — Step by Step](#7-implementation--step-by-step)
-   - [Step 1 — YAML Config Files](#step-1--yaml-config-files-serverdeeepstreamconfig)
-   - [Step 2 — Element Factory](#step-2--element-factory-serverdeeepstreamapplement_factorypy)
-   - [Step 3 — Settings](#step-3--settings-serverbackendappcoresettingspy)
-   - [Step 4 — Pipeline Wiring](#step-4--pipeline-wiring-serverdeeepstreamappdeeepstreamy)
+   - [Step 1 — YAML Config Files](#step-1--yaml-config-files-ospreyserverconfig)
+   - [Step 2 — Element Factory](#step-2--element-factory-ospreyserverdeepstreamelement_factorypy)
+   - [Step 3 — Settings](#step-3--settings-ospreyservercoresettingspy)
+   - [Step 4 — Pipeline Wiring](#step-4--pipeline-wiring-ospreyserverdeepstreampipelinepy)
    - [Step 5 — IPC serialization (no change needed)](#step-5--ipc-serialization-no-change-needed)
-   - [Step 7 — Client Drawing](#step-7--client-drawing-clientbase_clientpy)
+   - [Step 7 — Client Drawing](#step-7--client-drawing-ospreyclientbase_clientpy)
 8. [The Re-ID Model Setup (NvDeepSORT)](#8-the-re-id-model-setup-nvdeepsort)
 9. [Choosing an Algorithm — Decision Guide](#9-choosing-an-algorithm--decision-guide)
 10. [Config File Reference](#10-config-file-reference)
@@ -207,7 +207,7 @@ match them back to their original ID because their appearance matches the stored
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  SERVER CONTAINER (deepstream_app-8.0)                                    │
+│  SERVER PROCESS (osprey-server)                                           │
 │                                                                           │
 │  nvurisrcbin (RTSP/file)                                                  │
 │       │                                                                   │
@@ -250,9 +250,9 @@ match them back to their original ID because their appearance matches the stored
 │                         │                                                 │
 │              Unix domain socket /run/nvunixfd/<stream_id>.sock            │
 └─────────────────────────┼────────────────────────────────────────────────┘
-                          │  (shared volume: ./sockets)
+                          │  (Unix socket file on host filesystem)
 ┌─────────────────────────┼────────────────────────────────────────────────┐
-│  CLIENT CONTAINER (ds_client)                                             │
+│  CLIENT PROCESS (osprey-client)                                           │
 │                         │                                                 │
 │              nvunixfdsrc (reads socket)                                   │
 │                         │                                                 │
@@ -295,7 +295,7 @@ metadata serialization, handled by the prebuilt `serialize_meta.so` /
 format — the tracking ID simply rides the field that previously carried
 `INVALID_TRACKING_ID`, and the client reconstructs it into `NvDsObjectMeta`.
 
-### `base_client.py` — `_extract_objects()`
+### `osprey/client/base_client.py` — `_extract_objects()`
 
 ```python
 # Already extracted object_id from pyds metadata into ObjectData:
@@ -313,14 +313,14 @@ through as zero (`INVALID_TRACKING_ID`) because no tracker element existed.
 
 ## 7. Implementation — Step by Step
 
-### Step 1 — YAML Config Files (`server/deepstream/config/`)
+### Step 1 — YAML Config Files (`osprey/server/config/`)
 
 Four YAML files were created, one per algorithm. Each file configures the
 `NvMultiObjectTracker` library — it reads these on startup via `NvMOT_Query`.
 
 All configs are based on **NVIDIA's own reference configs** from
-`/opt/nvidia/deepstream/deepstream/samples/configs/deepstream-app/` inside the
-DS 8.0 container, with one deliberate change: `checkClassMatch: 0` in all configs.
+`/opt/nvidia/deepstream/deepstream/samples/configs/deepstream-app/` in the
+DS 8.0 installation, with one deliberate change: `checkClassMatch: 0` in all configs.
 
 **Why `checkClassMatch: 0`?**
 NVIDIA's defaults set this to `1`, which means the tracker only associates
@@ -400,8 +400,8 @@ ReID:
   offsets: [123.675, 116.28, 103.53]  # ImageNet mean subtraction
   netScaleFactor: 0.01735207  # 1/57.63 (ImageNet std normalization)
   addFeatureNormalization: 1  # L2-normalize output embeddings
-  tltEncodedModel: "/deepstream_app/deepstream/models/resnet50_market1501.etlt"
-  modelEngineFile: "/deepstream_app/deepstream/models/resnet50_market1501.etlt_b100_gpu0_fp16.engine"
+  tltEncodedModel: "/run/model/resnet50_market1501.etlt"
+  modelEngineFile: "/run/model/resnet50_market1501.etlt_b100_gpu0_fp16.engine"
 ```
 
 The preprocessing formula applied to each crop before inference:
@@ -415,7 +415,7 @@ reasonably to other object types.
 
 ---
 
-### Step 2 — Element Factory (`server/deepstream/app/element_factory.py`)
+### Step 2 — Element Factory (`osprey/server/deepstream/element_factory.py`)
 
 A new method was added to `DeepStreamElementFactory`:
 
@@ -450,17 +450,17 @@ ensures the ID is accessible in metadata downstream.
 
 ---
 
-### Step 3 — Settings (`server/backend/app/core/settings.py`)
+### Step 3 — Settings (`osprey/server/core/settings.py`)
 
 The original design had two separate env vars (`DS_TRACKER_CONFIG`, `DS_TRACKER_LL_LIB`).
 These were replaced with a single `DS_TRACKER` env var that resolves to a preset:
 
 ```python
 _TRACKER_PRESETS = {
-    "IOU":        "/deepstream_app/deepstream/config/config_tracker_IOU.yml",
-    "NvSORT":     "/deepstream_app/deepstream/config/config_tracker_NvSORT.yml",
-    "NvDCF":      "/deepstream_app/deepstream/config/config_tracker_NvDCF_perf.yml",
-    "NvDeepSORT": "/deepstream_app/deepstream/config/config_tracker_NvDeepSORT.yml",
+    "IOU":        "osprey/server/config/config_tracker_IOU.yml",
+    "NvSORT":     "osprey/server/config/config_tracker_NvSORT.yml",
+    "NvDCF":      "osprey/server/config/config_tracker_NvDCF_perf.yml",
+    "NvDeepSORT": "osprey/server/config/config_tracker_NvDeepSORT.yml",
 }
 
 @property
@@ -487,7 +487,7 @@ DS_TRACKER=NvDeepSORT   # or IOU / NvSORT / NvDCF / off
 
 ---
 
-### Step 4 — Pipeline Wiring (`server/deepstream/app/deepstream.py`)
+### Step 4 — Pipeline Wiring (`osprey/server/deepstream/pipeline.py`)
 
 #### Init order bug (found and fixed)
 
@@ -565,7 +565,7 @@ serializer or deserializer changes were required.
 
 ---
 
-### Step 7 — Client Drawing (`client/base_client.py`)
+### Step 7 — Client Drawing (`osprey/client/base_client.py`)
 
 Three methods were updated or added:
 
@@ -640,26 +640,22 @@ datasets. NVIDIA provides this as a TAO-encoded `.etlt` file on NGC.
 
 ### What was done
 
-1. Downloaded the model inside the running container:
+1. Downloaded the model on the host:
    ```bash
-   docker exec deepstream_app-8.0 bash -c "
-     mkdir -p /opt/nvidia/deepstream/deepstream/samples/models/Tracker/
-     wget 'https://api.ngc.nvidia.com/v2/models/nvidia/tao/reidentificationnet/versions/deployable_v1.0/files/resnet50_market1501.etlt' \
-          -P /opt/nvidia/deepstream/deepstream/samples/models/Tracker/
-   "
+   mkdir -p /run/model/
+   wget 'https://api.ngc.nvidia.com/v2/models/nvidia/tao/reidentificationnet/versions/deployable_v1.0/files/resnet50_market1501.etlt' \
+        -P /run/model/
    ```
 
-2. Copied it from the container's filesystem into the host project via the volume:
+2. Confirmed it landed next to the other tracker models:
    ```bash
-   docker exec deepstream_app-8.0 cp \
-     /opt/nvidia/deepstream/deepstream/samples/models/Tracker/resnet50_market1501.etlt \
-     /deepstream_app/deepstream/models/resnet50_market1501.etlt
+   ls /run/model/resnet50_market1501.etlt
    ```
 
-3. Updated `config_tracker_NvDeepSORT.yml` to point to the volume-mounted path:
+3. Updated `config_tracker_NvDeepSORT.yml` to point at that path:
    ```yaml
-   tltEncodedModel: "/deepstream_app/deepstream/models/resnet50_market1501.etlt"
-   modelEngineFile: "/deepstream_app/deepstream/models/resnet50_market1501.etlt_b100_gpu0_fp16.engine"
+   tltEncodedModel: "/run/model/resnet50_market1501.etlt"
+   modelEngineFile: "/run/model/resnet50_market1501.etlt_b100_gpu0_fp16.engine"
    ```
 
 ### What happens on first run
@@ -669,11 +665,12 @@ and compiles an optimized GPU engine. The engine is saved at `modelEngineFile`.
 On subsequent runs, TensorRT loads the engine directly (fast). The first build
 takes 2–5 minutes depending on GPU.
 
-### Why the model lives in `deepstream/models/`
+### Why the model lives in `/run/model/`
 
-The volume mount `./server:/deepstream_app` makes the model persistent across
-container restarts. If the model stayed only in the container's filesystem
-(`/opt/nvidia/...`), it would be lost every time the container is recreated.
+Keeping the model inside the package's models directory on the host filesystem
+makes it persistent and keeps it alongside the tracker config that references it.
+If it stayed only under the DeepStream sample tree (`/opt/nvidia/...`), it would
+be easy to lose track of and would not travel with the rest of the model assets.
 
 ---
 

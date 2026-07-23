@@ -14,10 +14,10 @@ The `nvtracker` GStreamer plugin sits after the PGIE (detector) in the pipeline.
 
 | File | What changed |
 |------|-------------|
-| `server/deepstream/config/config_tracker_NvSORT.yml` | New — low-level tracker YAML config |
-| `server/deepstream/app/element_factory.py` | Added `nvtracker()` factory method |
-| `server/backend/app/core/settings.py` | Added 4 tracker settings |
-| `server/deepstream/app/deepstream.py` | Inserted tracker into the pipeline |
+| `osprey/server/config/config_tracker_NvSORT.yml` | New — low-level tracker YAML config |
+| `osprey/server/deepstream/element_factory.py` | Added `nvtracker()` factory method |
+| `osprey/server/core/settings.py` | Added 4 tracker settings |
+| `osprey/server/deepstream/pipeline.py` | Inserted tracker into the pipeline |
 
 ---
 
@@ -94,7 +94,7 @@ Detected → [Tentative: probationAge=3 frames]
 
 ---
 
-## 2. Element factory — `element_factory.py`
+## 2. Element factory — `osprey/server/deepstream/element_factory.py`
 
 A new `nvtracker()` method was added to `DeepStreamElementFactory`:
 
@@ -115,13 +115,13 @@ The tracker internally scales video frames to `tracker_width × tracker_height` 
 
 ---
 
-## 3. Settings — `settings.py`
+## 3. Settings — `osprey/server/core/settings.py`
 
 Four new fields were added to `PipelineSettings`, all overridable via environment variables:
 
 | Setting | Env var | Default |
 |---------|---------|---------|
-| `tracker_config` | `DS_TRACKER_CONFIG` | `/deepstream_app/deepstream/config/config_tracker_NvSORT.yml` |
+| `tracker_config` | `DS_TRACKER_CONFIG` | `osprey/server/config/config_tracker_NvSORT.yml` |
 | `tracker_ll_lib` | `DS_TRACKER_LL_LIB` | `/opt/nvidia/deepstream/deepstream/lib/libnvds_nvmultiobjecttracker.so` |
 | `tracker_width` | `DS_TRACKER_WIDTH` | `640` |
 | `tracker_height` | `DS_TRACKER_HEIGHT` | `384` |
@@ -130,12 +130,12 @@ To disable the tracker at runtime, set `DS_TRACKER_CONFIG=` (empty string). The 
 
 To switch to a more accurate tracker (NvDCF), set:
 ```
-DS_TRACKER_CONFIG=/deepstream_app/deepstream/config/config_tracker_NvDCF_perf.yml
+DS_TRACKER_CONFIG=osprey/server/config/config_tracker_NvDCF_perf.yml
 ```
 
 ---
 
-## 4. Pipeline wiring — `deepstream.py`
+## 4. Pipeline wiring — `osprey/server/deepstream/pipeline.py`
 
 ### `_build_tracker()` method
 
@@ -207,5 +207,5 @@ def my_probe(pad, info, user_data):
 
 Change via env var — no code change needed:
 ```bash
-DS_TRACKER_CONFIG=/deepstream_app/deepstream/config/config_tracker_NvDCF_perf.yml
+DS_TRACKER_CONFIG=osprey/server/config/config_tracker_NvDCF_perf.yml
 ```

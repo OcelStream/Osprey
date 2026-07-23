@@ -1,34 +1,29 @@
 # TensorRT Engine Builder
 
-`server/deepstream/app/build_engines.py` runs automatically at container
-startup (via `entrypoint.sh`) before the DeepStream pipeline or the FastAPI
-app start. It checks every configured model and builds any missing TensorRT
-engines so the pipeline never encounters a cold-build delay at runtime.
+`osprey/server/deepstream/build_engines.py` builds the TensorRT engines the
+DeepStream pipeline needs. It is exposed as the `osprey-build-engines` CLI, run
+once ahead of time (before `osprey-server` starts) so the pipeline never
+encounters a cold-build delay at runtime. It checks every configured model and
+builds any missing engine.
 
 ---
 
 ## How it works
 
 ```
-docker compose up
+osprey-build-engines
       │
-      ▼
-entrypoint.sh
-      │
-      ├─ python3 build_engines.py
+      ├─ read GIE_0_CONFIG, GIE_1_CONFIG, … from env
       │         │
-      │         ├─ read GIE_0_CONFIG, GIE_1_CONFIG, … from env
-      │         │         │
-      │         │         ├─ engine exists? → skip
-      │         │         └─ engine missing? → trtexec → .engine
-      │         │
-      │         └─ exit 0 (all ok) / exit 1 (build failed)
+      │         ├─ engine exists? → skip
+      │         └─ engine missing? → trtexec → .engine
       │
-      └─ exec uvicorn ...   ← only reaches here if build_engines exits 0
+      └─ exit 0 (all ok) / exit non-zero (build failed)
 ```
 
-The healthcheck `start_period` is set to 20 minutes so Docker waits patiently
-while engines are building before declaring the container unhealthy.
+Building engines is a one-time step per model. Because it can take several
+minutes per model, run `osprey-build-engines` before you start `osprey-server`
+rather than on the hot path of a request.
 
 ---
 
@@ -78,7 +73,7 @@ DeepStream owns it.
 |-----------|-----------|
 | Engine file exists | Skipped immediately — no GPU work |
 | ONNX exists, engine missing | `trtexec` builds the engine (5–20 min) |
-| ONNX missing | Error — container exits 1, check your model path |
+| ONNX missing | Error — the command exits non-zero, check your model path |
 | Re-ID engine missing (NvDeepSORT) | DeepStream builds it on first pipeline run |
 
 ---
@@ -88,8 +83,8 @@ DeepStream owns it.
 Delete the engine file and restart:
 
 ```bash
-rm server/deepstream/models/yolo11l_bbox_v8-trt.onnx.engine
-docker compose restart deepstream
+rm /run/model/yolo11l_bbox_v8-trt.onnx.engine
+osprey-build-engines
 ```
 
 The builder detects the missing file and rebuilds from the ONNX.
@@ -98,12 +93,12 @@ The builder detects the missing file and rebuilds from the ONNX.
 
 ## Add a new model
 
-1. Add the ONNX to `server/deepstream/models/`
-2. Create (or copy) an nvinfer config in `server/deepstream/config/`
+1. Add the ONNX to `/run/model/`
+2. Create (or copy) an nvinfer config in `osprey/server/config/`
 3. Set the new env var in `.env`:
 
 ```env
-GIE_1_CONFIG=/deepstream_app/deepstream/config/config_pgie_yolo_seg.txt
+GIE_1_CONFIG=osprey/server/config/config_pgie_yolo_seg.txt
 ```
 
 The builder picks up every `GIE_N_CONFIG` variable automatically — no code
@@ -118,10 +113,10 @@ changes needed.
 
 ## Run the builder manually
 
-To build engines without starting the full stack:
+To build engines without starting the server:
 
 ```bash
-docker compose run --rm deepstream python3 deepstream/app/build_engines.py
+osprey-build-engines
 ```
 
 ---
@@ -131,15 +126,14 @@ docker compose run --rm deepstream python3 deepstream/app/build_engines.py
 During a build you will see:
 
 ```
-[entrypoint] Building TensorRT engines...
+Building TensorRT engines...
 2026-04-17 10:31:20 INFO: GIE_0 engine exists, skip: .../model.engine
 2026-04-17 10:31:20 INFO: Building ONNX engine: .../model.onnx → .../model.engine
 2026-04-17 10:31:20 INFO:   cmd: trtexec --onnx=... --saveEngine=... ...
 ...
 2026-04-17 10:45:03 INFO: Engine ready: .../model.engine
 2026-04-17 10:45:03 INFO: Engine build summary: 1 built, 0 already existed (skip), 0 errors
-[entrypoint] Starting application...
 ```
 
-If a build fails the container exits immediately with code 1 so the problem
-is visible before the pipeline starts.
+If a build fails the command exits immediately with a non-zero code so the
+problem is visible before you start the pipeline.

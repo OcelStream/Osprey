@@ -1,9 +1,8 @@
 # Element Factory — Centralised GStreamer Element Creation
 
 > **Status:** Implemented  
-> **New file:** `server/deepstream/app/element_factory.py`  
-> **Changed:** `server/deepstream/app/deepstream.py` — `_attach_preprocessing`, `_build_output_branch`  
-> **Related:** [Refactoring Suggestions §9](../local/refactoring-suggestions.md) · [Architecture Proposal §7](../local/architecture-proposal.md#7-data-plane--the-inference-pipeline)
+> **New file:** `osprey/server/deepstream/element_factory.py`  
+> **Changed:** `osprey/server/deepstream/pipeline.py` — `_attach_preprocessing`, `_build_output_branch`
 
 ---
 
@@ -53,14 +52,14 @@ the developer found and copied the loop — a copy-paste trap.
 
 ## 2. The Code Before — Full Inline Blocks
 
-These are the exact blocks that existed in `deepstream.py` before this
+These are the exact blocks that existed in `pipeline.py` before this
 refactoring. They are preserved here so you can see precisely what was
 duplicated and why the factory was introduced.
 
 ### `_attach_preprocessing` — before
 
 ```python
-# deepstream.py — _attach_preprocessing (old)
+# pipeline.py — _attach_preprocessing (old)
 
 conv = self._create_element("nvvideoconvert", f"conv_{stream_id}")
 caps = self._create_element("capsfilter", f"capsfilter_{stream_id}")
@@ -81,7 +80,7 @@ caps.set_property(
 ### `_build_output_branch` — before
 
 ```python
-# deepstream.py — _build_output_branch (old)
+# pipeline.py — _build_output_branch (old)
 
 elems = {
     "q_demux": self._create_element("queue",          f"q_demux_{stream_id}"),
@@ -130,7 +129,7 @@ for key in ("q_demux", "q_fd"):
 | Duplicated thing | Occurrences before | Risk |
 |------------------|--------------------|------|
 | `nvbuf-memory-type = NVBUF_MEM_CUDA_UNIFIED` | 2 (one per method) | Miss one when porting to Jetson → silent crash |
-| `pyds.NVBUF_MEM_CUDA_UNIFIED` import | Used in `deepstream.py` just for this | Unnecessary GStreamer/pyds coupling |
+| `pyds.NVBUF_MEM_CUDA_UNIFIED` import | Used in `pipeline.py` just for this | Unnecessary GStreamer/pyds coupling |
 | Queue 4-property block | 1 loop covering 2 queues | Any new queue misses it unless the loop is found and copied |
 | Caps set as raw string inline | 3 occurrences | No central place to validate format strings |
 
@@ -141,7 +140,7 @@ for key in ("q_demux", "q_fd"):
 ### `_attach_preprocessing` — after
 
 ```python
-# deepstream.py — _attach_preprocessing (now)
+# pipeline.py — _attach_preprocessing (now)
 
 conv = self._element_factory.nvvideoconvert(f"conv_{stream_id}")
 caps = self._element_factory.capsfilter(
@@ -156,7 +155,7 @@ caps = self._element_factory.capsfilter(
 ### `_build_output_branch` — after
 
 ```python
-# deepstream.py — _build_output_branch (now)
+# pipeline.py — _build_output_branch (now)
 
 elems = {
     "q_demux":   self._element_factory.queue(f"q_demux_{stream_id}"),
@@ -196,7 +195,7 @@ that applies platform-aware and consistent defaults at the point of creation.
 | `conv.set_property("nvbuf-memory-type", int(pyds.NVBUF_MEM_CUDA_UNIFIED))` | `self._element_factory.nvvideoconvert(name)` |
 | `caps.set_property("caps", Gst.Caps.from_string(...))` | `self._element_factory.capsfilter(name, caps_string)` |
 | 4-line loop per queue (`leaky`, `max-size-*`) | `self._element_factory.queue(name)` |
-| `pyds` imported in `deepstream.py` for memory type | `pyds` used only in `element_factory.py` |
+| `pyds` imported in `pipeline.py` for memory type | `pyds` used only in `element_factory.py` |
 
 Porting to Jetson now requires changing one line: the `platform` argument
 passed to `DeepStreamElementFactory(platform=...)`.
@@ -205,7 +204,7 @@ passed to `DeepStreamElementFactory(platform=...)`.
 
 ## 5. DeepStreamElementFactory — API Reference
 
-**File:** [server/deepstream/app/element_factory.py](../../server/deepstream/app/element_factory.py)
+**File:** `osprey/server/deepstream/element_factory.py`
 
 ### `__init__(platform: str = "x86")`
 
@@ -297,10 +296,10 @@ correct format for the iGPU encoder pipeline.
 
 ### To port to Jetson
 
-Change the single instantiation in `deepstream.py`:
+Change the single instantiation in `pipeline.py`:
 
 ```python
-# deepstream.py — __init__
+# pipeline.py — __init__
 # Before (x86 default):
 self._element_factory = DeepStreamElementFactory()
 
@@ -353,7 +352,7 @@ intentionally created with `_create_element` rather than
 
 Setting `nvbuf-memory-type=NVBUF_MEM_CUDA_UNIFIED` on `conv2` changes the
 output buffer's memory type. `nvunixfdsink` passes a CUDA IPC handle for this
-buffer to the client container's `nvunixfdsrc`. If the memory type does not
+buffer to the client process's `nvunixfdsrc`. If the memory type does not
 match what `nvunixfdsrc` expects, the IPC handle import fails:
 
 ```
@@ -387,7 +386,7 @@ def nvjpegenc(self, name: str, quality: int = 85) -> Gst.Element:
     return elem
 ```
 
-Then use it anywhere in `deepstream.py`:
+Then use it anywhere in `pipeline.py`:
 
 ```python
 enc = self._element_factory.nvjpegenc("jpeg_cam1")

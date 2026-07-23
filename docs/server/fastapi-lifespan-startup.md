@@ -1,9 +1,8 @@
 # FastAPI Lifespan — Pipeline Startup & Readiness
 
 > **Status:** Implemented  
-> **Files changed:** `server/backend/app/app.py`, `server/deepstream/app/deepstream.py`  
-> **Replaces:** `time.sleep(3)` race condition  
-> **Related:** [Startup Race Condition (detail)](../local/startup-race-condition.md) · [Architecture Proposal §6](../local/architecture-proposal.md#6-control-plane--fastapi--pipeline-lifecycle)
+> **Files changed:** `osprey/server/app.py`, `osprey/server/deepstream/pipeline.py`  
+> **Replaces:** `time.sleep(3)` race condition
 
 ---
 
@@ -64,7 +63,7 @@ The fix has two parts that work together:
 
 | Part | Where | What it does |
 |------|-------|-------------|
-| `threading.Event` | `deepstream.py` | Pipeline signals when it reaches `PLAYING` |
+| `threading.Event` | `pipeline.py` | Pipeline signals when it reaches `PLAYING` |
 | FastAPI `lifespan` | `app.py` | Startup code runs exactly once, before any request is accepted |
 
 Together they guarantee: **no HTTP request is accepted until the pipeline
@@ -74,7 +73,7 @@ signals it is ready**, with a 30-second hard timeout if something is broken.
 
 ## 3. Implementation
 
-### 3.1 `DynamicRTSPPipeline` — `deepstream.py`
+### 3.1 `DynamicRTSPPipeline` — `pipeline.py`
 
 **In `__init__`** — add the readiness event next to the existing lock:
 
@@ -107,8 +106,8 @@ thread calling `self._ready.wait()` is unblocked at this exact moment.
 ```python
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from backend.app.api.v1.endpoints import router
-from backend.app.core.context import pipeline
+from osprey.server.api.v1.endpoints import router
+from osprey.server.core.context import pipeline
 import threading
 
 
@@ -142,11 +141,15 @@ Key points:
 
 ## 4. Startup Sequence
 
+The server is launched by the `osprey-server` entry point (uvicorn target
+`osprey.server.app:app`), or programmatically via `osprey.serve()`. Either way
+uvicorn drives the same `lifespan` sequence below.
+
 ```
 uvicorn starts
     │
     ▼
-app.py imported
+app.py imported (osprey.server.app:app)
     │  pipeline object created (context.py)
     │  router routes registered
     │
@@ -226,7 +229,7 @@ async def lifespan(app: FastAPI):
     pipeline.stop()
 ```
 
-`DynamicRTSPPipeline.stop()` is implemented in `deepstream.py`:
+`DynamicRTSPPipeline.stop()` is implemented in `pipeline.py`:
 
 ```python
 def stop(self) -> None:
@@ -255,7 +258,7 @@ In-flight stream teardown is not guaranteed in that case.
 
 ### `/health/ready` endpoint
 
-Added to `server/backend/app/api/v1/endpoints.py`:
+Added to `osprey/server/api/v1/endpoints.py`:
 
 ```python
 @router.get("/health/ready")
@@ -272,31 +275,36 @@ Returns `503` with a detail message until then.
 This endpoint is intentionally simple — it checks a single boolean flag.
 There is no lock contention and the response is always fast.
 
-### Docker Compose `healthcheck` + `depends_on`
+### Client-process readiness gate
 
-`docker-compose.yml` now has:
+`ospreyai` runs as a bare-metal library — the server process (`osprey-server`,
+uvicorn target `osprey.server.app:app`) and the client process (`osprey-client`)
+run side by side on one host, communicating over Unix sockets in `/run/nvunixfd`.
+There is no Docker Compose orchestration to gate startup ordering, so the client
+process performs the readiness gate itself before it opens any socket:
 
-```yaml
-deepstream:
-  ...
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/ready"]
-    interval: 10s
-    timeout: 5s
-    retries: 5
-    start_period: 30s
+```python
+# osprey-client — wait for the server pipeline to reach PLAYING
+import time, httpx
 
-ds_client:
-  depends_on:
-    deepstream:
-      condition: service_healthy
-  ...
+READY_URL = "http://localhost:8000/api/v1/health/ready"
+
+def wait_for_server(timeout: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if httpx.get(READY_URL, timeout=5).status_code == 200:
+                return
+        except httpx.RequestError:
+            pass
+        time.sleep(1)
+    raise RuntimeError("server pipeline not ready within 30s")
 ```
 
-Docker Compose will:
-1. Start the `deepstream` container and begin polling `/api/v1/health/ready`.
-2. Mark it `healthy` only after 5 consecutive `200` responses.
-3. Only then start the `ds_client` container.
+The client:
+1. Polls `/api/v1/health/ready` (or waits for the socket directory
+   `/run/nvunixfd` to be populated) before connecting.
+2. Proceeds only after a `200` response confirms the pipeline is `PLAYING`.
 
 This eliminates the last remaining startup race — the client will never try
 to read Unix sockets before the server pipeline is `PLAYING`.
@@ -307,5 +315,5 @@ to read Unix sockets before the server pipeline is `PLAYING`.
 
 | File | Change |
 |------|--------|
-| [app.py](../../server/backend/app/app.py) | Replaced module-level `Thread + sleep` with `lifespan` context manager |
-| [deepstream.py](../../server/deepstream/app/deepstream.py) | Added `self._ready = threading.Event()` in `__init__`; added `self._ready.set()` in `start()` after `set_state(PLAYING)` |
+| `osprey/server/app.py` | Replaced module-level `Thread + sleep` with `lifespan` context manager |
+| `osprey/server/deepstream/pipeline.py` | Added `self._ready = threading.Event()` in `__init__`; added `self._ready.set()` in `start()` after `set_state(PLAYING)` |

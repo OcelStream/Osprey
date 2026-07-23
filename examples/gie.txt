@@ -1,0 +1,49 @@
+# Example GIE (nvinfer) config — YOLO detection.
+#
+# Pass this to osprey.configure(gie_config="…/gie.txt").
+#
+# THREE paths below are environment-specific — set them before use:
+#   onnx-file / model-engine-file  -> your model
+#   labelfile-path                 -> your class labels (one per line)
+#   custom-lib-path                -> the parser .so that SHIPS WITH ospreyai.
+#
+# Resolve the shipped parser path with:
+#   python3 -c "import osprey,os;print(os.path.join(os.path.dirname(osprey.__file__),'server','deepstream','lib','nvdsinfer_yolo_det.so'))"
+#
+# Parsers shipped in the package (osprey/server/deepstream/lib/):
+#   nvdsinfer_yolo_det.so  -> YOLO detection      (parse-bbox-func-name=NvDsInferParseCustomYoloDet)
+#   nvdsinfer_yolo_seg.so  -> YOLO segmentation
+#   nvdsinfer_rtdetr.so    -> RT-DETR detection
+#
+# Do NOT point custom-lib-path at /deepstream_app/… — that was the old dev
+# layout; the parser now lives inside the installed ospreyai package.
+
+[property]
+gpu-id=0
+net-scale-factor=0.0039215697906911373
+model-color-format=0
+
+# --- model (edit these) ---
+onnx-file=/path/to/yolo26m-trt.onnx
+model-engine-file=/path/to/yolo26m-trt.onnx.engine
+labelfile-path=/path/to/labels.txt
+
+batch-size=1
+network-mode=2
+num-detected-classes=80
+infer-dims=3;640;640
+interval=0
+gie-unique-id=1
+process-mode=1
+network-type=0
+cluster-mode=4
+maintain-aspect-ratio=1
+symmetric-padding=1
+
+# --- parser (edit custom-lib-path to the shipped .so, see header) ---
+parse-bbox-func-name=NvDsInferParseCustomYoloDet
+custom-lib-path=/opt/venv/lib/python3.12/site-packages/osprey/server/deepstream/lib/nvdsinfer_yolo_det.so
+
+[class-attrs-all]
+threshold=0.25
+topk=100

@@ -1,7 +1,7 @@
 # Building Applications on `DeepStreamClient`
 
 **Scope:** This document shows how to build a real application on top of
-`DeepStreamClient` — the base class in `client/base_client.py`. It is written
+`DeepStreamClient` — the base class in `osprey/client/base_client.py`. It is written
 so that a developer who has never touched GStreamer or pyds can build a
 working video analytics application by only writing plain Python.
 
@@ -99,7 +99,7 @@ class StreamRecord:
 The simplest possible application — log object counts per frame:
 
 ```python
-from base_client import DeepStreamClient, FrameData
+from osprey.client import DeepStreamClient, FrameData
 
 class ObjectCounter(DeepStreamClient):
     def _process_frame(self, frame_data: FrameData) -> None:
@@ -137,7 +137,7 @@ def _process_frame(self, frame_data):
 
 ```python
 from dataclasses import dataclass
-from base_client import ClientConfig
+from osprey.client import ClientConfig
 
 @dataclass
 class ParkingConfig(ClientConfig):
@@ -323,7 +323,7 @@ from dataclasses import dataclass
 import cv2
 import requests
 
-from base_client import ClientConfig, DeepStreamClient, FrameData, StreamRecord
+from osprey.client import ClientConfig, DeepStreamClient, FrameData, StreamRecord
 
 logger = logging.getLogger(__name__)
 

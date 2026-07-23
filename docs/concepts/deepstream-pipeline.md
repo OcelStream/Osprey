@@ -139,7 +139,7 @@ that is not accessible from the CPU without an explicit copy. This is why:
 
 - `nvvideoconvert` needs `nvbuf-memory-type` set to tell it which NVMM pool to use
 - `nvdsosd` metadata drawing works via DeepStream's metadata API (not direct pixel access)
-- Moving frames between containers uses file descriptor passing (not memcpy)
+- Moving frames between processes uses file descriptor passing (not memcpy)
 
 On x86, `NVBUF_MEM_CUDA_UNIFIED` allocates in unified memory that both CPU
 and GPU can address — necessary for the CPU-side metadata operations. On Jetson,

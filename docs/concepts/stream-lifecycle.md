@@ -122,7 +122,7 @@ within a few hundred milliseconds.
 
 ### 9. Client picks up the socket
 
-The `ds_client` container's watcher loop detects the new `.sock` file and
+The client process's watcher loop detects the new `.sock` file and
 creates a receiving pipeline (`nvunixfdsrc` → ... → RTSP mount).
 
 ---

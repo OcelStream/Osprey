@@ -7,10 +7,11 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 Third-party model artifacts
 ================================================================================
 
-The sample model artifacts distributed under `server/deepstream/models/` are NOT
-covered by the Apache-2.0 license that applies to Osprey's source code. Each is
-governed by its own upstream license. Review and comply with these before
-redistributing the models or using them in a commercial product.
+Osprey ships the DeepStream parser/serializer libraries but does NOT bundle model
+weights — you supply your own model (ONNX/engine). The model families Osprey's
+parsers support are each governed by their own upstream license, NOT the
+Apache-2.0 license that applies to Osprey's source code. Review and comply with
+these before deploying a model or using it in a commercial product.
 
   RT-DETR-L  (rtdetr-l-det-template.onnx)
     Upstream: RT-DETR (https://github.com/lyuwenyu/RT-DETR)
