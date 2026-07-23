@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ospreyai"
-version = "0.1.4"
+version = "0.1.5"
 description = "Dynamic multi-stream video-analytics library on NVIDIA DeepStream 8.0"
 readme = "README.md"
 requires-python = ">=3.10"

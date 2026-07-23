@@ -41,6 +41,8 @@ from gi.repository import GLib, GObject, Gst, GstRtspServer
 
 import pyds
 
+from osprey.paths import default_socket_dir, ensure_socket_dir
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     _handler = logging.StreamHandler()
@@ -63,7 +65,7 @@ class ClientConfig:
     """
 
     rtsp_port: str = "8554"
-    watch_dir: str = "/run/nvunixfd"
+    watch_dir: str = field(default_factory=default_socket_dir)
     watch_interval: float = 1.0
     stale_retry_interval: float = 30.0
     socket_connect_timeout: float = 2.0
@@ -78,12 +80,15 @@ class ClientConfig:
     def from_env(
         cls,
         rtsp_port: str = "8554",
-        watch_dir: str = "/run/nvunixfd",
+        watch_dir: Optional[str] = None,
     ) -> "ClientConfig":
-        """Build config from environment variables and explicit arguments."""
+        """Build config from environment variables and explicit arguments.
+
+        ``watch_dir=None`` resolves to ``$OSPREY_SOCKET_DIR`` or ``./sockets``.
+        """
         return cls(
             rtsp_port=rtsp_port,
-            watch_dir=watch_dir,
+            watch_dir=ensure_socket_dir(watch_dir),
             save_frames=os.environ.get("SAVE_FRAMES", "0") == "1",
             drawing_type=os.environ.get("DRAWING_TYPE", "native"),
             show_info_text=bool(os.environ.get("SHOW_INFO_TEXT", True)),
@@ -217,7 +222,7 @@ class DeepStreamClient:
     def __init__(
         self,
         rtsp_port: str = "8554",
-        watch_dir: str = "/run/nvunixfd",
+        watch_dir: Optional[str] = None,
         config: Optional[ClientConfig] = None,
     ):
         """
@@ -225,7 +230,9 @@ class DeepStreamClient:
 
         Args:
             rtsp_port: Port for the RTSP server
-            watch_dir: Directory to watch for socket files
+            watch_dir: Directory to watch for socket files. Defaults to
+                       ``$OSPREY_SOCKET_DIR`` or ``./sockets`` under the
+                       working directory — created if it doesn't exist.
             config: Pre-built config (skips from_env if provided)
         """
         Gst.init(None)
@@ -233,6 +240,9 @@ class DeepStreamClient:
         self._config = config or self._config_class.from_env(
             rtsp_port=rtsp_port, watch_dir=watch_dir
         )
+        # A pre-built config may name a directory that doesn't exist yet; the
+        # watcher needs it present to scan.
+        ensure_socket_dir(self._config.watch_dir)
 
         # --- RTSP server ---
         self._rtsp_server = GstRtspServer.RTSPServer()
@@ -1346,7 +1356,7 @@ def main():
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    client = DeepStreamClient(rtsp_port="8554", watch_dir="/run/nvunixfd")
+    client = DeepStreamClient(rtsp_port="8554")
     client._config.watch_interval = 2.0
     return client.start(wait_for_sockets=True)
 

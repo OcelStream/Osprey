@@ -6,6 +6,8 @@ from typing import List, Optional
 from pydantic import Field, AliasChoices, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from osprey.paths import default_socket_dir
+
 # ---------------------------------------------------------------------------
 # Packaged resource locations.
 #
@@ -79,6 +81,13 @@ class PipelineSettings(BaseSettings):
     )
     codec: str = "H265"
     bitrate: int = 4_000_000
+    # Directory holding the per-stream IPC sockets. Defaults to ./sockets in
+    # the working directory the app was launched from — the client watches the
+    # same path (see osprey.paths).
+    socket_dir: str = Field(
+        default_factory=default_socket_dir,
+        validation_alias=AliasChoices("OSPREY_SOCKET_DIR", "DS_SOCKET_DIR", "socket_dir"),
+    )
     meta_serialization_lib: str = Field(
         default=str(_LIB_DIR / "serialize_meta.so"),
         validation_alias=AliasChoices("DS_META_SERIALIZATION_LIB", "meta_serialization_lib"),

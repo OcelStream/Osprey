@@ -5,6 +5,21 @@ All notable changes to `ospreyai` are documented here. Versions follow
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-23
+### Changed
+- IPC sockets no longer default to `/run/nvunixfd` (root-owned, container-only).
+  The server's `nvunixfdsink` and the client's watcher now share `./sockets`
+  under the working directory the app is launched from — created automatically,
+  no `sudo` needed. Override with the `OSPREY_SOCKET_DIR` env var,
+  `osprey.configure(socket_dir=…)`, or `DeepStreamClient(watch_dir=…)`; set
+  `OSPREY_SOCKET_DIR=/run/nvunixfd` to keep the old location.
+
+### Added
+- `osprey.paths` helper (`default_socket_dir` / `ensure_socket_dir`) — single
+  source of truth both halves read to resolve the socket directory.
+- `socket_dir` field on `PipelineSettings` (aliases `OSPREY_SOCKET_DIR` /
+  `DS_SOCKET_DIR`).
+
 ## [0.1.4] - 2026-07-23
 ### Added
 - `osprey-doctor` CLI — checks that `gi` + `pyds` + `osprey` + the DeepStream

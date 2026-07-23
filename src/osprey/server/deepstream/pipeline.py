@@ -3,7 +3,8 @@ Dynamic DeepStream pipeline with runtime source management.
 
 Supports adding and removing video sources at runtime. Each source gets
 a dedicated output branch with nvunixfdsink streaming frames to a Unix
-domain socket at /run/nvunixfd/<stream_id>.sock.
+domain socket at <socket_dir>/<stream_id>.sock — by default ./sockets in the
+working directory the app was launched from (see osprey.paths).
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from gi.repository import GLib, Gst
 
 import pyds
 
+from osprey.paths import ensure_socket_dir
 from osprey.server.deepstream._fps import GETFPS, PERF_DATA
 from osprey.server.deepstream.element_factory import DeepStreamElementFactory
 from osprey.server.deepstream.source_bin_factory import SourceBinFactory
@@ -68,7 +70,7 @@ class DynamicRTSPPipeline:
     """DeepStream pipeline supporting runtime add / remove of video sources.
 
     Each source gets a dedicated ``nvunixfdsink`` output branch reachable
-    at ``/run/nvunixfd/<stream_id>.sock``.
+    at ``<socket_dir>/<stream_id>.sock`` (``./sockets`` by default).
     """
 
     def __init__(
@@ -388,7 +390,9 @@ class DynamicRTSPPipeline:
         elems["osd"].set_property("display-mask", 0)
         elems["osd"].set_property("display-text", 0)
 
-        socket_path = f"/run/nvunixfd/{stream_id}.sock"
+        # Created on first use — no root-owned /run path to provision.
+        socket_dir = ensure_socket_dir(self._config.socket_dir)
+        socket_path = os.path.join(socket_dir, f"{stream_id}.sock")
         fdsink = elems["fdsink"]
         fdsink.set_property("socket-path", socket_path)
         fdsink.set_property("sync", True)
