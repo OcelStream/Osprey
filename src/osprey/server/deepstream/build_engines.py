@@ -16,6 +16,7 @@ import configparser
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -27,6 +28,32 @@ logger = logging.getLogger(__name__)
 
 # nvinfer network-mode → trtexec precision flag
 _ONNX_PRECISION = {"0": [], "1": ["--int8"], "2": ["--fp16"]}
+
+# trtexec is part of the TensorRT install but frequently NOT on PATH (it lives
+# under /usr/src/tensorrt/bin). Resolve it explicitly so the pre-builder works
+# on a bare host, not just inside a container that put it on PATH.
+_TRTEXEC_CANDIDATES = (
+    "/usr/src/tensorrt/bin/trtexec",
+    "/opt/nvidia/deepstream/deepstream/bin/trtexec",
+    "/usr/local/tensorrt/bin/trtexec",
+)
+
+
+def find_trtexec() -> str | None:
+    """Return a usable trtexec path, or None if it can't be found.
+
+    Order: ``$TRTEXEC`` override → ``PATH`` → known TensorRT install dirs.
+    """
+    env = os.environ.get("TRTEXEC")
+    if env and os.path.isfile(env):
+        return env
+    on_path = shutil.which("trtexec")
+    if on_path:
+        return on_path
+    for cand in _TRTEXEC_CANDIDATES:
+        if os.path.isfile(cand):
+            return cand
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -147,8 +174,17 @@ def build_onnx_engine(
                 "  Patch failed — building as-is (engine will only support batch=1)"
             )
 
+    trtexec = find_trtexec()
+    if trtexec is None:
+        logger.error(
+            "trtexec not found (looked on PATH, $TRTEXEC, and %s) — cannot "
+            "pre-build %s. Install TensorRT or set $TRTEXEC.",
+            ", ".join(_TRTEXEC_CANDIDATES), onnx_file,
+        )
+        return False
+
     cmd = [
-        "trtexec",
+        trtexec,
         f"--onnx={onnx_to_build}",
         f"--saveEngine={engine_file}",
         f"--device={gpu_id}",
@@ -196,6 +232,49 @@ def parse_gie_config(path: str) -> dict:
         "gpu_id":       p.get("gpu-id", "0"),
         "infer_dims":   p.get("infer-dims", ""),  # e.g. "3;640;640"
     }
+
+
+def prebuild_engines(config_paths: list[str]) -> int:
+    """Pre-build any missing engines for an explicit list of GIE config paths.
+
+    This is the programmatic entry point used by the server at startup
+    (``osprey.configure(gie_config=…)`` sets the configs directly rather than
+    through ``GIE_N_CONFIG`` env vars). For each config it builds the ONNX to
+    the config's ``model-engine-file`` path **only if that file is missing**,
+    so nvinfer loads a ready engine instead of building one mid-startup (which
+    would race the readiness timeout and, because nvinfer auto-names its own
+    output, rebuild on every run).
+
+    Returns the number of engines that failed to build (0 = all good/skipped).
+    Best-effort: a failure is logged and left for nvinfer to retry, never raised.
+    """
+    errors = 0
+    for config_path in config_paths:
+        if not config_path or not os.path.isfile(config_path):
+            logger.warning("GIE config not found, skipping pre-build: %s", config_path)
+            continue
+        params = parse_gie_config(config_path)
+        onnx, engine = params["onnx_file"], params["engine_file"]
+        if not onnx or not engine:
+            logger.info(
+                "GIE %s: no onnx-file/model-engine-file — leaving engine to nvinfer",
+                config_path,
+            )
+            continue
+        if os.path.isfile(engine):
+            logger.info("Engine present, skip pre-build: %s", engine)
+            continue
+        ok = build_onnx_engine(
+            onnx_file=onnx,
+            engine_file=engine,
+            batch_size=params["batch_size"],
+            network_mode=params["network_mode"],
+            gpu_id=params["gpu_id"],
+            infer_dims=params["infer_dims"],
+        )
+        if not ok:
+            errors += 1
+    return errors
 
 
 def collect_gie_models() -> list:

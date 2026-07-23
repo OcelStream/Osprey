@@ -141,6 +141,35 @@ def get_settings() -> PipelineSettings:
         return _settings
 
 
+def prebuild_engines() -> None:
+    """Build any missing TensorRT engines for the configured GIE(s) up front.
+
+    Restores the pre-build step the old container entrypoint ran before uvicorn:
+    without it, nvinfer builds the engine in-process during startup, which both
+    races the readiness timeout and (because nvinfer auto-names its serialized
+    engine) rebuilds on every run. Building to each config's ``model-engine-file``
+    path here means nvinfer just loads a ready engine.
+
+    Best-effort and idempotent: existing engines are skipped, and a build
+    failure is logged (nvinfer will still attempt its own build) rather than
+    raised.
+    """
+    configs = get_settings().gie_configs
+    if not configs:
+        return
+    from osprey.server.deepstream.build_engines import prebuild_engines as _prebuild
+
+    logger.info("Pre-building engines for %d GIE config(s)…", len(configs))
+    failed = _prebuild(configs)
+    if failed:
+        logger.warning(
+            "%d engine(s) could not be pre-built — nvinfer will try to build "
+            "them during startup (this may take minutes; raise serve()'s "
+            "ready_timeout if it is killed).",
+            failed,
+        )
+
+
 def get_pipeline():
     """Return the singleton :class:`DynamicRTSPPipeline`, building it on first use."""
     global _pipeline
@@ -174,6 +203,10 @@ def start(host: str = "0.0.0.0", port: int = 8000, background: bool = False):
     import uvicorn
 
     from osprey.server.app import app
+
+    # Build missing engines before the pipeline starts, so nvinfer loads a
+    # ready engine instead of building one mid-startup.
+    prebuild_engines()
 
     config = uvicorn.Config(app, host=host, port=port)
     server = uvicorn.Server(config)
@@ -256,7 +289,7 @@ def serve(
     host: str = "0.0.0.0",
     port: int = 8000,
     wait_ready: bool = True,
-    ready_timeout: float = 180.0,
+    ready_timeout: float = 600.0,
 ) -> ServerHandle:
     """Start the server in its **own process** and return once it is healthy.
 
@@ -276,10 +309,17 @@ def serve(
         A :class:`ServerHandle`; call ``.stop()`` to shut the server down (it is
         also terminated automatically at interpreter exit).
     """
+    # Pre-build any missing engines HERE in the parent, before forking, so the
+    # (potentially multi-minute) TensorRT build happens outside the child's
+    # readiness window — otherwise wait_ready would time out mid-build and tear
+    # the server down. trtexec runs in its own subprocess and touches neither
+    # CUDA nor GStreamer in this process, so it's safe to run pre-fork.
+    global _default_url
+    prebuild_engines()
+
     # Fork BEFORE the parent initializes CUDA/GStreamer (the client does that
     # later). 'fork' avoids re-importing the developer's __main__, so no
     # ``if __name__ == '__main__'`` guard is needed in a single-file script.
-    global _default_url
     ctx = multiprocessing.get_context("fork")
     proc = ctx.Process(
         target=_server_entry,

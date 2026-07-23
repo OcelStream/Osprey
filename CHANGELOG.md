@@ -5,6 +5,28 @@ All notable changes to `ospreyai` are documented here. Versions follow
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-07-23
+### Fixed
+- Engines are pre-built again before the pipeline starts. The container
+  entrypoint used to run `build_engines.py` before uvicorn, but the single-file
+  `serve()` flow skipped it, so nvinfer built the engine in-process mid-startup.
+  That both raced `serve()`'s readiness timeout (the server was torn down before
+  the build finished) and rebuilt on every run (nvinfer auto-names its
+  serialized engine, ignoring `model-engine-file`). `serve()` now pre-builds any
+  missing engines in the parent process, before forking, to each config's
+  `model-engine-file` path — so nvinfer loads a ready engine.
+- `build_engines` now locates `trtexec` when it isn't on `PATH` (via `$TRTEXEC`,
+  then known TensorRT install dirs such as `/usr/src/tensorrt/bin`).
+
+### Changed
+- `serve()` `ready_timeout` default raised `180 → 600s` to accommodate a genuine
+  cold engine build if a pre-build isn't possible.
+
+### Added
+- `osprey.server.deepstream.build_engines.prebuild_engines(config_paths)` and
+  `find_trtexec()` — programmatic pre-build driven by the configured GIE list
+  (the new `configure(gie_config=…)` flow, not just `GIE_N_CONFIG` env vars).
+
 ## [0.1.5] - 2026-07-23
 ### Changed
 - IPC sockets no longer default to `/run/nvunixfd` (root-owned, container-only).
